@@ -1,0 +1,48 @@
+[project]
+name = "cp-genie"
+version = "0.1.0"
+description = "RAG chatbot system for CP chula"
+authors = [
+    {name = "Thiraput01",email = "Thiraputball@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "langchain>=0.1.0",
+    "langchain-google-genai",
+    "langchain-huggingface",
+    "langchain-qdrant",
+    "langchain-community",
+    "langgraph",
+    "sentence-transformers",
+    "qdrant-client",
+    "fastembed",
+    "datasets",
+    "pandas",
+    "tqdm",
+    "requests",
+    "beautifulsoup4",
+    "python-dotenv"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+    { include = "chat", from = "src" },
+    { include = "data", from = "src" },
+    { include = "model", from = "src" }
+]
+
+[tool.poetry.scripts]
+cp-genie = "chat.main:main"
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "*"
+ipykernel = "*"
+black = "*"
+isort = "*"
+pytest = "*"
