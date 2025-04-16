@@ -25,7 +25,7 @@ def get_all_sitemap_links(index_url: str) -> list[str]:
 
 def parse_sitemap(sitemap_url):
     response = requests.get(sitemap_url)
-    response.raise_for_status()  # ensure the request was successful
+    response.raise_for_status()
     root = ET.fromstring(response.content)
     urls = []
     namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
@@ -43,7 +43,6 @@ def scrape_docs(url: str) -> Document:
     if not content_div:
         raise ValueError(f"No #content found in {url}")
 
-    # Extract text and clean up
     body = content_div.get_text(separator="\n", strip=True)
     h1_post = soup.select_one("h1.title-post")
     if h1_post:
@@ -61,17 +60,13 @@ def scrape_docs(url: str) -> Document:
     return Document(page_content=body, metadata=metadata)
 
 def scrape() -> list[Document]:
-    
-    # Get sitemap URLs
     index_url = os.getenv("SITEMAP_URL")
     sitemap_urls = get_all_sitemap_links(index_url)
     
-    # Parse each sitemap and extract URLs
     urls = []
     for sitemap_url in tqdm(sitemap_urls, position=0, leave=True):
         urls += parse_sitemap(sitemap_url)
-        
-    # Store to docs
+
     docs = []
     for url in tqdm(urls, desc="Scraping URLs", position=0, leave=True):
         try:

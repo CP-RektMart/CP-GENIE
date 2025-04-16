@@ -21,8 +21,7 @@ def chunk_docs(docs: list[Document]) -> list[Document]:
 
 def get_dense_embedder() -> HuggingFaceEmbeddings:
     return HuggingFaceEmbeddings(
-        model_name=os.getenv("EMBEDDING_MODEL"),
-        trust_remote_code=True
+        model_name=os.getenv("EMBEDDING_MODEL")
     )
 
 def get_sparse_embedder() -> FastEmbedSparse:

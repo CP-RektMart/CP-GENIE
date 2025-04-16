@@ -1,39 +1,29 @@
+from langchain.schema import Document
+from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.messages import get_buffer_string
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
-import dotenv
-from langchain.schema import Document
-
-dotenv.load_dotenv()
 
 SYSTEM_PROMPT = """
-    You are a helpful assistant. You will be provided with a context and a question.
-    Your task is to answer the question based on the context.
-    You should not provide any additional information or context.
-    If the answer is not in the context, say "I don't know".
-    If the question is not clear, ask for clarification.
-    You should be concise and to the point.
-    Do not repeat the question in your answer.
-    Do not include any disclaimers or unnecessary information.
+You are a helpful assistant. You will be provided with a context and a question.
+Your task is to answer the question based on the context.
+If the answer is not in the context, say "I don't know".
 """
 
-def get_llm() -> ChatGoogleGenerativeAI:
+def get_llm():
     return ChatGoogleGenerativeAI(
         model=os.getenv("LLM_MODEL"),
         temperature=float(os.getenv("LLM_TEMPERATURE")),
         max_tokens=int(os.getenv("LLM_MAX_TOKENS"))
     )
+    
+def build_prompt(history: BaseChatMessageHistory, docs: list[Document], query: str) -> str:
+    chat_str = get_buffer_string(history.messages)
+    context_str = "\n".join(doc.page_content for doc in docs)
 
-
-def get_context(docs: list[Document]) -> str:
-    context = ""
-    for doc in docs:
-        title = doc.metadata.get("title", "Untitled")
-        content = doc.page_content
-        context += f"Title: {title}\nContent: {content}\n\n"
-    return context
-
-
-def generate_answer(llm: ChatGoogleGenerativeAI, query: str, context: str) -> str:
-    sys_prompt = SYSTEM_PROMPT
-    prompt = f"{SYSTEM_PROMPT}\n\nContext:\n{context}\n\nQuestion: {query}\n\nAnswer:"
-    return llm.predict(prompt)
+    return (
+        f"{SYSTEM_PROMPT}\n\n"
+        f"Chat History:\n{chat_str}\n\n"
+        f"Context:\n{context_str}\n\n"
+        f"Q: {query}\nA:"
+    )

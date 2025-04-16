@@ -4,8 +4,8 @@ from langchain.schema import Document
 from langchain_qdrant import FastEmbedSparse, QdrantVectorStore, RetrievalMode
 from qdrant_client import QdrantClient, models
 from qdrant_client.http.models import Distance, SparseVectorParams, VectorParams
-from src.data.scrape import scrape_docs
-from src.model.embedding.embedder import get_dense_embedder, get_sparse_embedder, chunk_docs
+from data.scrape import scrape_docs
+from model.embedding.embedder import get_dense_embedder, get_sparse_embedder, chunk_docs
 
 dotenv.load_dotenv()
 
