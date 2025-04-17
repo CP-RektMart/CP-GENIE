@@ -9,8 +9,6 @@ from model.embedding.embedder import get_dense_embedder, get_sparse_embedder, ch
 
 dotenv.load_dotenv()
 
-COLLECTION_NAME = "cp-genie"
-
 def create_qdrant_client() -> QdrantClient:
     return QdrantClient(
         url=os.getenv("QDRANT_URL"),
@@ -20,7 +18,7 @@ def create_qdrant_client() -> QdrantClient:
 def create_qdrant_vectorstore(client: QdrantClient) -> QdrantVectorStore:
     return QdrantVectorStore(
         client=client,
-        collection_name=COLLECTION_NAME,
+        collection_name=os.getenv("QDRANT_COLLECTION_NAME"),
         embedding=get_dense_embedder(),
         sparse_embedding=get_sparse_embedder(),
         retrieval_mode=RetrievalMode.HYBRID,

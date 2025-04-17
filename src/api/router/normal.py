@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 from api.schema.chat import ChatRequest, ChatResponse
 from model.memory.chat_memory import get_chat, get_session_history
 
 router = APIRouter()
 
 @router.post("/{session_id}", response_model=ChatResponse)
-def ask_question(req: Request, session_id: str, chatrequest: ChatRequest):
+def ask_question(req: Request, session_id: str, chatrequest: ChatRequest) -> ChatResponse:
     llm = req.app.state.llm
     qdrant = req.app.state.qdrant
     chain = get_chat(session_id, chatrequest.k, llm, qdrant)
