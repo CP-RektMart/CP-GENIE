@@ -4,3 +4,4 @@
 *.pyc
 poetry.lock
 venv/
+data/

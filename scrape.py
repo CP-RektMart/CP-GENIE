@@ -214,28 +214,41 @@ def get_urls_from_sitemap(sitemap_url: str) -> List[str]:
         return []
 
 
-# Ignore these URLs
-IGNORE_URLS = [
-    "https://www.cp.eng.chula.ac.th/blog/archives/tag/*",
-    "https://www.cp.eng.chula.ac.th/blog/archives/category/*",
-    "https://www.cp.eng.chula.ac.th/blog/archives/author/*",
+# Ignore these URLs (as regex patterns)
+IGNORE_URL_PATTERNS = [
+    r"^https://www\.cp\.eng\.chula\.ac\.th/blog/archives/tag/.*",
+    r"^https://www\.cp\.eng\.chula\.ac\.th/blog/archives/category/.*",
+    r"^https://www\.cp\.eng\.chula\.ac\.th/blog/archives/author/.*",
+    # Uncomment below to skip wp-content, pdfs, images, office docs
+    r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*",
+    # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.pdf",
+    # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(jpg|jpeg|png|gif|webp)",
+    # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(doc|docx|xls|xlsx|ppt|pptx)",
 ]
+IGNORE_URLS = [re.compile(pattern) for pattern in IGNORE_URL_PATTERNS]
 
-# Test URLs
-test_urls = [
-    "https://www.cp.eng.chula.ac.th/blog/archives/35393",
-    "https://www.cp.eng.chula.ac.th/blog/archives/48",
-    "https://www.cp.eng.chula.ac.th/blog/archives/34948",
-    "https://www.cp.eng.chula.ac.th/future/bachelor2018",
-]
+# # Test URLs
+# test_urls = [
+#     "https://www.cp.eng.chula.ac.th/blog/archives/35393",
+#     "https://www.cp.eng.chula.ac.th/blog/archives/48",
+#     "https://www.cp.eng.chula.ac.th/blog/archives/34948",
+#     "https://www.cp.eng.chula.ac.th/future/bachelor2018",
+# ]
 
-queue = deque(test_urls)
+# queue = deque(test_urls)
+
+# --- Initialize the queue with the sitemap URLs ---
+sitemap_url = "https://www.cp.eng.chula.ac.th/sitemap.xml"
+queue = deque(get_urls_from_sitemap(sitemap_url))
 
 # --- Main Scraping Loop ---
 while queue:
     current_url = queue.popleft()
 
-    if current_url in visited_urls:
+    if current_url in visited_urls or any(
+        re.match(ignore, current_url) for ignore in IGNORE_URLS
+    ):
+        print(f"Skipping already visited or ignored URL: {current_url}")
         continue
 
     print(f"Scraping: {current_url}")
@@ -299,51 +312,45 @@ while queue:
                         parsed_url.scheme in ["http", "https"]
                         and parsed_url.netloc == BASE_DOMAIN
                         and absolute_url not in visited_urls
-                        and not any(
-                            re.match(ignore, absolute_url) for ignore in IGNORE_URLS
-                        )
                         and "#" not in absolute_url
                     ):
                         if absolute_url not in queue:
                             queue.append(absolute_url)
 
-                # Extract URLs from image tags
-                for img in content_area.find_all("img", src=True):
-                    src = img["src"]
-                    absolute_url = urljoin(current_url, src)
-                    parsed_url = urlparse(absolute_url)
+                # # Extract URLs from image tags
+                # for img in content_area.find_all("img", src=True):
+                #     src = img["src"]
+                #     absolute_url = urljoin(current_url, src)
+                #     parsed_url = urlparse(absolute_url)
 
-                    if (
-                        parsed_url.scheme in ["http", "https"]
-                        and parsed_url.netloc == BASE_DOMAIN
-                        and absolute_url not in visited_urls
-                    ):
-                        if absolute_url not in queue:
-                            queue.append(absolute_url)
+                #     if (
+                #         parsed_url.scheme in ["http", "https"]
+                #         and parsed_url.netloc == BASE_DOMAIN
+                #         and absolute_url not in visited_urls
+                #     ):
+                #         if absolute_url not in queue:
+                #             queue.append(absolute_url)
 
-                # Extract URLs from other resource tags (source, link, iframe, etc.)
-                for tag in content_area.find_all(["source", "link", "iframe"]):
-                    # Check for src or href attributes
-                    url_attr = None
-                    if tag.has_attr("src"):
-                        url_attr = tag["src"]
-                    elif tag.has_attr("href"):
-                        url_attr = tag["href"]
+                # # Extract URLs from other resource tags (source, link, iframe, etc.)
+                # for tag in content_area.find_all(["source", "link", "iframe"]):
+                #     # Check for src or href attributes
+                #     url_attr = None
+                #     if tag.has_attr("src"):
+                #         url_attr = tag["src"]
+                #     elif tag.has_attr("href"):
+                #         url_attr = tag["href"]
 
-                    if url_attr:
-                        absolute_url = urljoin(current_url, url_attr)
-                        parsed_url = urlparse(absolute_url)
+                #     if url_attr:
+                #         absolute_url = urljoin(current_url, url_attr)
+                #         parsed_url = urlparse(absolute_url)
 
-                        if (
-                            parsed_url.scheme in ["http", "https"]
-                            and parsed_url.netloc == BASE_DOMAIN
-                            and absolute_url not in visited_urls
-                            and not any(
-                                re.match(ignore, absolute_url) for ignore in IGNORE_URLS
-                            )
-                        ):
-                            if absolute_url not in queue:
-                                queue.append(absolute_url)
+                #         if (
+                #             parsed_url.scheme in ["http", "https"]
+                #             and parsed_url.netloc == BASE_DOMAIN
+                #             and absolute_url not in visited_urls
+                #         ):
+                #             if absolute_url not in queue:
+                #                 queue.append(absolute_url)
 
     except requests.exceptions.RequestException as e:
         print(f"  Error fetching {current_url}: {e}")
@@ -354,16 +361,16 @@ while queue:
     time.sleep(DELAY)
     # break  # Uncomment this line to continue scraping all URLs in the queue
 
-# Debugging output
-print("-" * 20)
-print("Visited URLs:")
-for url in visited_urls:
-    print(url)
+# # Debugging output
+# print("-" * 20)
+# print("Visited URLs:")
+# for url in visited_urls:
+#     print(url)
 
-print("-" * 20)
-print("Remaining URLs in queue:")
-for url in queue:
-    print(url)
+# print("-" * 20)
+# print("Remaining URLs in queue:")
+# for url in queue:
+#     print(url)
 
 print("-" * 20)
 print(f"Scraping finished. Visited {len(visited_urls)} pages.")
