@@ -9,13 +9,15 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
-    "langchain>=0.1.17",
+    "langchain>=0.1.18",
     "langchain-google-genai",
     "langchain-huggingface",
     "langchain-qdrant",
     "langchain-community",
     "langchain-core",
     "langgraph",
+    "redis",
+    "langchain-redis",
     "sentence-transformers",
     "qdrant-client",
     "fastembed",
@@ -35,14 +37,11 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 packages = [
-    { include = "chat", from = "src" },
-    { include = "data", from = "src" },
-    { include = "model", from = "src" },
-    { include = "api", from = "src" }
+    { include = "cp_genie", from = "src" }
 ]
 
 [tool.poetry.scripts]
-cp-genie = "chat.chat:main"
+start = "run:main"
 
 [tool.poetry.group.dev.dependencies]
 jupyter = "*"
