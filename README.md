@@ -1,6 +1,7 @@
 # CP-Genie
 
 A RAG-based chatbot system built with LangGraph, LangChain, and FastAPI.  
+
 ---
 
 ## Installation
