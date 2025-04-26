@@ -5,7 +5,7 @@ A RAG-based chatbot system built with LangGraph, LangChain, and FastAPI.
 
 ## Installation
 
-Make sure you have **Python 3.11+** and **Poetry** installed.
+Make sure you have **Python 3.11+** and [**Poetry**](https://python-poetry.org/) installed.
 
 ```bash
 # Clone the repo
