@@ -2,6 +2,7 @@ import logging
 import sys
 from loguru import logger
 
+
 def configure_logging(level: str = "INFO") -> None:
     """
     Replace the stdlib root handler with Loguru and forward all stdlib logs.
@@ -17,7 +18,7 @@ def configure_logging(level: str = "INFO") -> None:
             logger_opt.log(record.levelname, record.getMessage())
 
     logging.root.addHandler(_InterceptHandler())
-    
+
     logger.remove()
     logger.add(
         sys.stderr,
@@ -26,7 +27,7 @@ def configure_logging(level: str = "INFO") -> None:
         backtrace=False,
         diagnose=False,
         format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-               "<level>{level: <8}</level> | "
-               "<cyan>{name}:{function}:{line}</cyan> - "
-               "<level>{message}</level>",
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}:{function}:{line}</cyan> - "
+        "<level>{message}</level>",
     )

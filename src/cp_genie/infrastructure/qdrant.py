@@ -11,6 +11,8 @@ client = QdrantClient(
 
 embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model)
 sparse_embeddings = FastEmbedSparse(model_name=settings.sparse_embedding_model)
+
+
 def initialize_vectorstore():
     vectorstore = QdrantVectorStore(
         client=client,

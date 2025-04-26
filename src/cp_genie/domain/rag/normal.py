@@ -4,6 +4,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from cp_genie.domain.rag.base import State
 
+
 class NormalRAG:
     def __init__(self, llm, retriever, memory):
         self.llm = llm
@@ -12,10 +13,15 @@ class NormalRAG:
         self.chain = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "Answer as concisely as possible."),
-            ("human", "chat history: {messages}\ndocuments: {context}\nquestion: {question}"),
-        ])
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", "Answer as concisely as possible."),
+                (
+                    "human",
+                    "chat history: {messages}\nretrieved context: {context}\nquestion: {question}",
+                ),
+            ]
+        )
         combine_chain = create_stuff_documents_chain(self.llm, prompt)
 
         def retrieve(state) -> State:
@@ -23,11 +29,13 @@ class NormalRAG:
             return {**state, "context": docs}
 
         def generate(state) -> State:
-            result = combine_chain.invoke({
-                "messages": state["messages"],
-                "context": state["context"],
-                "question": state["question"],
-            })
+            result = combine_chain.invoke(
+                {
+                    "messages": state["messages"],
+                    "context": state["context"],
+                    "question": state["question"],
+                }
+            )
             self.memory.add_user_message(state["question"])
             self.memory.add_ai_message(result)
             return {**state, "output": result}
@@ -47,6 +55,6 @@ class NormalRAG:
             "messages": self.memory.messages,
             "question": input["input"],
             "context": [],
-            "output": ""
+            "output": "",
         }
         return self.chain.invoke(state)

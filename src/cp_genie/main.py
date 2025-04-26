@@ -8,6 +8,7 @@ from cp_genie.api.v1.router import router as v1_router
 from cp_genie.core.config import Settings
 from cp_genie.core.logging import configure_logging
 from cp_genie.infrastructure.llm import get_llm
+
 # from cp_genie.infrastructure.redis import redis
 from cp_genie.infrastructure.qdrant import client
 from cp_genie.infrastructure.qdrant import initialize_vectorstore
@@ -15,6 +16,7 @@ from cp_genie.infrastructure.qdrant import initialize_vectorstore
 
 settings = Settings()
 configure_logging()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, Any]:

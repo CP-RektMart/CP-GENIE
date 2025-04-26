@@ -9,6 +9,7 @@ import sys
 
 dotenv.load_dotenv()
 
+
 def get_all_sitemap_links(index_url: str) -> list[str]:
     res = requests.get(index_url)
     res.raise_for_status()
@@ -28,9 +29,9 @@ def parse_sitemap(sitemap_url):
     response.raise_for_status()
     root = ET.fromstring(response.content)
     urls = []
-    namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
-    for url in root.findall('ns:url', namespace):
-        loc = url.find('ns:loc', namespace).text
+    namespace = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    for url in root.findall("ns:url", namespace):
+        loc = url.find("ns:loc", namespace).text
         urls.append(loc)
     return urls
 
@@ -59,10 +60,11 @@ def scrape_docs(url: str) -> Document:
 
     return Document(page_content=body, metadata=metadata)
 
+
 def scrape() -> list[Document]:
     index_url = os.getenv("SITEMAP_URL")
     sitemap_urls = get_all_sitemap_links(index_url)
-    
+
     urls = []
     for sitemap_url in tqdm(sitemap_urls, position=0, leave=True):
         urls += parse_sitemap(sitemap_url)
@@ -76,5 +78,5 @@ def scrape() -> list[Document]:
             print(f"[SKIP] {e}")
         except Exception as e:
             print(f"[ERROR] Unexpected error on {url}: {e}")
-    
+
     return docs
