@@ -14,23 +14,11 @@ class AgenticRAG:
         self.chain = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "Use the available tools to retrieve useful context and answer as concisely as possible.",
-                ),
-                (
-                    "human",
-                    "chat history: {messages}\nretrieved context: {context}\nquestion: {question}",
-                ),
-            ]
-        )
-        combine_chain = create_stuff_documents_chain(self.llm, prompt)
-
-        # Set up an agent to choose tools
-        agent = create_tool_calling_agent(self.llm, self.tools)
-        agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
+        def query(state) -> State:
+            self.memory.add_user_message(state["question"])
+            llm_with_tools = self.llm.bind_tools(self.tools)
+            response = llm_with_tools.invoke(state["messages"])
+            return {"messages": state["messages"] + [response]}
 
         def retrieve(state) -> State:
             tool_inputs = {"input": state["question"]}
@@ -48,6 +36,24 @@ class AgenticRAG:
             self.memory.add_user_message(state["question"])
             self.memory.add_ai_message(result)
             return {**state, "output": result}
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "Use the available tools to retrieve useful context and answer as concisely as possible.",
+                ),
+                (
+                    "human",
+                    "chat history: {messages}\nretrieved context: {context}\nquestion: {question}",
+                ),
+            ]
+        )
+        combine_chain = create_stuff_documents_chain(self.llm, prompt)
+
+        # Set up an agent to choose tools
+        agent = create_tool_calling_agent(self.llm, self.tools)
+        agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
 
         graph = StateGraph(State)
         graph.add_node("retrieve", RunnableLambda(retrieve))

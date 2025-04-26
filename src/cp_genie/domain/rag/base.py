@@ -6,6 +6,4 @@ from langchain_core.documents import Document
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-    question: str
     context: list[Document]
-    output: str

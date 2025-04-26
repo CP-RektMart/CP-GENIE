@@ -9,6 +9,11 @@ class InMemoryHistory(BaseChatMessageHistory, BaseModel):
     def get_messages(self) -> list[BaseMessage]:
         return self.messages
 
+    def get_lastest_message(self) -> BaseMessage:
+        if self.messages:
+            return self.messages[-1]
+        return None
+
     def add_messages(self, messages: list[BaseMessage]) -> None:
         self.messages.extend(messages)
 

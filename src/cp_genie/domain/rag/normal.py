@@ -2,6 +2,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableLambda
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.messages import HumanMessage
 from cp_genie.domain.rag.base import State
 
 
@@ -13,19 +14,9 @@ class NormalRAG:
         self.chain = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", "Answer as concisely as possible."),
-                (
-                    "human",
-                    "chat history: {messages}\nretrieved context: {context}\nquestion: {question}",
-                ),
-            ]
-        )
-        combine_chain = create_stuff_documents_chain(self.llm, prompt)
-
         def retrieve(state) -> State:
-            docs = self.retriever.invoke(state["question"])
+            last_message = self.memory.get_lastest_message().content
+            docs = self.retriever.invoke(last_message)
             return {**state, "context": docs}
 
         def generate(state) -> State:
@@ -33,13 +24,23 @@ class NormalRAG:
                 {
                     "messages": state["messages"],
                     "context": state["context"],
-                    "question": state["question"],
                 }
             )
-            self.memory.add_user_message(state["question"])
             self.memory.add_ai_message(result)
-            return {**state, "output": result}
 
+            updated_messages = self.memory.get_messages()
+            return {**state, "messages": updated_messages}
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", "Answer as concisely as possible."),
+                (
+                    "human",
+                    "chat history: {messages}\nretrieved context: {context}\n",
+                ),
+            ]
+        )
+        combine_chain = create_stuff_documents_chain(self.llm, prompt)
         graph = StateGraph(State)
         graph.add_node("retrieve", RunnableLambda(retrieve))
         graph.add_node("generate", RunnableLambda(generate))
@@ -50,11 +51,10 @@ class NormalRAG:
 
         return graph.compile()
 
-    def invoke(self, input: dict) -> State:
+    def invoke(self, input) -> State:
+        self.memory.add_user_message(HumanMessage(content=input))
         state: State = {
-            "messages": self.memory.messages,
-            "question": input["input"],
+            "messages": self.memory.get_messages(),
             "context": [],
-            "output": "",
         }
         return self.chain.invoke(state)

@@ -40,10 +40,10 @@ async def chat(
     rag_class = RAG_CLASSES[rag_type]
     memory = get_by_session_id(session_id)
     chain = rag_class(llm, retriever, memory)
-    result = chain.invoke({"input": chatrequest.query})
+    result = chain.invoke(chatrequest.query)
     history = memory.get_messages()
 
     return ChatResponse(
-        answer=result["output"],
+        answer=result["messages"][-1].content,
         history=[{"type": msg.type, "content": msg.content} for msg in history],
     )
