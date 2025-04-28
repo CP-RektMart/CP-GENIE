@@ -1,75 +1,109 @@
 from langgraph.graph import StateGraph, END
-from langchain_core.runnables import RunnableLambda
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from cp_genie.domain.rag.base import State
-from langchain.agents import Tool, AgentExecutor, create_tool_calling_agent
+from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.tools import tool
+from langgraph.prebuilt import ToolNode, tools_condition
+from typing import List
+from langchain_core.documents import Document
 
 
 class AgenticRAG:
-    def __init__(self, llm, tools, memory):
+    def __init__(self, llm, retriever, memory):
         self.llm = llm
-        self.tools = tools  # list of Tool objects
+        self.retriever = retriever
         self.memory = memory
         self.chain = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
-        def query(state) -> State:
-            self.memory.add_user_message(state["question"])
-            llm_with_tools = self.llm.bind_tools(self.tools)
-            response = llm_with_tools.invoke(state["messages"])
-            return {"messages": state["messages"] + [response]}
+        @tool
+        def retrieve(query: str) -> List[Document]:
+            """
+            Retrieves information related to the input query
+            from a vector database containing information
+            on Computer Engineering at Chulalongkorn University.
+            Use this tool ONLY when the user asks a question that requires specific
+            knowledge about the university or department. Do not use for general conversation.
+            """
+            docs = self.retriever.invoke(query)
+            return docs
 
-        def retrieve(state) -> State:
-            tool_inputs = {"input": state["question"]}
-            tool_result = agent_executor.invoke(tool_inputs)
-            return {**state, "context": tool_result.get("output", [])}
-
-        def generate(state) -> State:
-            result = combine_chain.invoke(
-                {
-                    "messages": state["messages"],
-                    "context": state["context"],
-                    "question": state["question"],
-                }
-            )
-            self.memory.add_user_message(state["question"])
-            self.memory.add_ai_message(result)
-            return {**state, "output": result}
+        tools = [retrieve]
+        tool_node = ToolNode(tools)
+        llm_with_tools = self.llm.bind_tools(tools)
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                (
-                    "system",
-                    "Use the available tools to retrieve useful context and answer as concisely as possible.",
-                ),
+                ("system", "Answer as concisely as possible."),
                 (
                     "human",
-                    "chat history: {messages}\nretrieved context: {context}\nquestion: {question}",
+                    "chat history: {messages}\nretrieved context: {context}\n",
                 ),
             ]
         )
         combine_chain = create_stuff_documents_chain(self.llm, prompt)
 
-        # Set up an agent to choose tools
-        agent = create_tool_calling_agent(self.llm, self.tools)
-        agent_executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
+        def query_or_respond(state: State) -> dict:
+            print("--- Agent Node: Query or Respond ---")
+            messages = state["messages"]
+            response = llm_with_tools.invoke(messages)
+            return {"messages": [response]}
+
+        def generate(state: State) -> dict:
+            print("--- Generate Node ---")
+            messages = state["messages"]
+            last_message = messages[-1]
+
+            if not isinstance(last_message, ToolMessage):
+                raise ValueError(
+                    "Last message is not a ToolMessage. Generation node expects tool output."
+                )
+
+            retrieved_docs = last_message.content
+            if not isinstance(retrieved_docs, list) or not all(
+                isinstance(doc, Document) for doc in retrieved_docs
+            ):
+                if isinstance(retrieved_docs, str):
+                    retrieved_docs = [Document(page_content=retrieved_docs)]
+                else:
+                    retrieved_docs = [Document(page_content=str(retrieved_docs))]
+
+            generation = combine_chain.invoke(
+                {
+                    "messages": messages,
+                    "context": retrieved_docs,
+                }
+            )
+
+            self.memory.add_ai_message(generation)
+            return {"messages": [generation]}
 
         graph = StateGraph(State)
-        graph.add_node("retrieve", RunnableLambda(retrieve))
-        graph.add_node("generate", RunnableLambda(generate))
+        graph.add_node("agent", query_or_respond)
+        graph.add_node("tools", tool_node)
+        graph.add_node("generate", generate)
 
-        graph.set_entry_point("retrieve")
-        graph.add_edge("retrieve", "generate")
+        graph.set_entry_point("agent")
+
+        graph.add_conditional_edges(
+            "agent",
+            tools_condition,
+            {
+                "tools": "tools",
+                END: END,
+            },
+        )
+
+        graph.add_edge("tools", "generate")
         graph.add_edge("generate", END)
 
         return graph.compile()
 
-    def invoke(self, input: dict) -> State:
-        state: State = {
-            "messages": self.memory.messages,
-            "question": input["input"],
+    def invoke(self, input) -> State:
+        self.memory.add_user_message(HumanMessage(content=input))
+        initial_state: State = {
+            "messages": self.memory.get_messages(),
             "context": [],
-            "output": "",
         }
-        return self.chain.invoke(state)
+        return self.chain.invoke(initial_state)
