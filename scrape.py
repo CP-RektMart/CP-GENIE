@@ -10,6 +10,7 @@ from typing import List, Optional
 import json
 from datetime import datetime
 import mimetypes
+from collections import deque
 
 # --- Configuration ---
 START_URL = "https://www.cp.eng.chula.ac.th/"
@@ -39,7 +40,6 @@ DELAY = 2
 visited_urls = set()
 
 # --- Queue for URLs to scrape ---
-from collections import deque
 
 # --- Content type mapping ---
 CONTENT_TYPE_DIRS = {
