@@ -40,6 +40,33 @@ packages = [
     { include = "cp_genie", from = "src" }
 ]
 
+# Ruff
+[tool.ruff]
+fix = true
+indent-width = 4
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["D100", "D103"]
+
+
+# Checks
+[tool.poetry.group.checks]
+optional = true
+
+[tool.poetry.group.checks.dependencies]
+ruff = "^0.4.0"
+mypy = "^1.8.0"
+pytest = "^8.1.1"
+
+
 [tool.poetry.scripts]
 start = "run:main"
 
