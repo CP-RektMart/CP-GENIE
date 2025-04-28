@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from cp_genie.domain.rag.base import State
+from cp_genie.domain.rag.base import State, BaseRAG
 from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -9,14 +9,9 @@ from typing import List
 from langchain_core.documents import Document
 
 
-class AgenticRAG:
-    def __init__(self, llm, retriever, memory):
-        self.llm = llm
-        self.retriever = retriever
-        self.memory = memory
-        self.chain = self._build_graph()
-
+class AgenticRAG(BaseRAG):
     def _build_graph(self) -> StateGraph:
+
         @tool
         def retrieve(query: str) -> List[Document]:
             """
@@ -35,23 +30,26 @@ class AgenticRAG:
 
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", "Answer as concisely as possible."),
+                (
+                    "system",
+                    "You are a helpful assistant. Answer the user's final query based on the provided retrieved context if you need to and the preceding chat history. Be concise.",
+                ),
                 (
                     "human",
-                    "chat history: {messages}\nretrieved context: {context}\n",
+                    "Retrieved context:\n\n{context}\n\n---\
+                    \n\nChat History:\n{messages}\n\n---\
+                    \n\nQuery: {query}\nPlease answer the query based on the context and history.",
                 ),
             ]
         )
         combine_chain = create_stuff_documents_chain(self.llm, prompt)
 
-        def query_or_respond(state: State) -> dict:
-            print("--- Agent Node: Query or Respond ---")
+        def agent(state: State) -> dict:
             messages = state["messages"]
             response = llm_with_tools.invoke(messages)
             return {"messages": [response]}
 
         def generate(state: State) -> dict:
-            print("--- Generate Node ---")
             messages = state["messages"]
             last_message = messages[-1]
 
@@ -69,10 +67,20 @@ class AgenticRAG:
                 else:
                     retrieved_docs = [Document(page_content=str(retrieved_docs))]
 
+            query = ""
+            for msg in reversed(messages[:-1]):
+                if isinstance(msg, HumanMessage):
+                    query = msg.content
+                    break
+            if not query:
+                # should not be here
+                query = "Answer that I don't know the answer."
+
             generation = combine_chain.invoke(
                 {
                     "messages": messages,
                     "context": retrieved_docs,
+                    "query": query,
                 }
             )
 
@@ -80,7 +88,7 @@ class AgenticRAG:
             return {"messages": [generation]}
 
         graph = StateGraph(State)
-        graph.add_node("agent", query_or_respond)
+        graph.add_node("agent", agent)
         graph.add_node("tools", tool_node)
         graph.add_node("generate", generate)
 
@@ -99,11 +107,3 @@ class AgenticRAG:
         graph.add_edge("generate", END)
 
         return graph.compile()
-
-    def invoke(self, input) -> State:
-        self.memory.add_user_message(HumanMessage(content=input))
-        initial_state: State = {
-            "messages": self.memory.get_messages(),
-            "context": [],
-        }
-        return self.chain.invoke(initial_state)
