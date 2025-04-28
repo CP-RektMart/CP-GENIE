@@ -14,22 +14,6 @@ class NormalRAG:
         self.chain = self._build_graph()
 
     def _build_graph(self) -> StateGraph:
-        def retrieve(state) -> State:
-            last_message = self.memory.get_lastest_message().content
-            docs = self.retriever.invoke(last_message)
-            return {**state, "context": docs}
-
-        def generate(state) -> State:
-            result = combine_chain.invoke(
-                {
-                    "messages": state["messages"],
-                    "context": state["context"],
-                }
-            )
-            self.memory.add_ai_message(result)
-
-            updated_messages = self.memory.get_messages()
-            return {**state, "messages": updated_messages}
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -41,6 +25,23 @@ class NormalRAG:
             ]
         )
         combine_chain = create_stuff_documents_chain(self.llm, prompt)
+
+        def retrieve(state) -> State:
+            last_message = self.memory.get_lastest_message().content
+            docs = self.retriever.invoke(last_message)
+            return {**state, "context": docs}
+
+        def generate(state) -> State:
+            result = combine_chain.invoke(
+                {
+                    "messages": state["messages"],
+                    "context": state.get("context", []),
+                }
+            )
+            self.memory.add_ai_message(result)
+            updated_messages = self.memory.get_messages()
+            return {**state, "messages": updated_messages}
+
         graph = StateGraph(State)
         graph.add_node("retrieve", RunnableLambda(retrieve))
         graph.add_node("generate", RunnableLambda(generate))
@@ -53,8 +54,8 @@ class NormalRAG:
 
     def invoke(self, input) -> State:
         self.memory.add_user_message(HumanMessage(content=input))
-        state: State = {
+        initial_state: State = {
             "messages": self.memory.get_messages(),
             "context": [],
         }
-        return self.chain.invoke(state)
+        return self.chain.invoke(initial_state)
