@@ -10,7 +10,7 @@ Make sure you have **Python 3.11+** and [**Poetry**](https://python-poetry.org/)
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-user/cp-genie.git
+git clone https://github.com/CP-RektMart/CP-GENIE.git
 cd cp-genie
 
 # Install dependencies using Poetry
