@@ -6,7 +6,7 @@ import time
 import re
 import hashlib
 import xml.etree.ElementTree as ET
-from typing import List, Optional
+from typing import List
 import json
 from datetime import datetime
 import mimetypes
