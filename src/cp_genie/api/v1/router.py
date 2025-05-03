@@ -3,7 +3,7 @@ from fastapi import Request
 
 from cp_genie.domain.rag.normal import NormalRAG
 from cp_genie.domain.rag.agentic import AgenticRAG
-from cp_genie.api.v1.schema import ChatRequest, ChatResponse
+from cp_genie.api.v1.schema import ChatRequest, ChatResponse, MessageHistoryItem
 from cp_genie.infrastructure.chat_memory import get_by_session_id
 
 router = APIRouter(tags=["chat"])
@@ -44,7 +44,15 @@ async def chat(
     result = chain.invoke(chatrequest.query)
     history = memory.get_messages()
 
+    history_items: list[MessageHistoryItem] = []
+    for msg in history:
+        history_items.append(
+            MessageHistoryItem(
+                type=msg.type,
+                content=str(msg.content),
+            )
+        )
     return ChatResponse(
         answer=result["messages"][-1].content,
-        history=[{"type": msg.type, "content": msg.content} for msg in history],
+        history=history_items,
     )

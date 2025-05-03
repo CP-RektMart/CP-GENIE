@@ -9,5 +9,4 @@ def get_llm() -> ChatGoogleGenerativeAI:
         model=setting.llm_model,
         temperature=setting.llm_temperature,
         max_tokens=setting.llm_max_tokens,
-        streaming=True,
     )

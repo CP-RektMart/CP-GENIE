@@ -2,14 +2,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    sitemap_url: str
-    groq_api_key: str
-    google_api_key: str
+    sitemap_url: str = "https://www.cp.eng.chula.ac.th/sitemap.xmll"
+    groq_api_key: str = ""
+    google_api_key: str = ""
 
-    langsmith_api_key: str
+    langsmith_api_key: str = ""
 
     qdrant_url: str = "http://localhost:6333"
-    qdrant_api_key: str
+    qdrant_api_key: str = ""
     qdrant_collection_name: str = "cp_genie"
     redis_url: str = "redis://localhost:6379"
 

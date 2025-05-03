@@ -1,6 +1,7 @@
 from langchain_core.chat_history import BaseChatMessageHistory
 from pydantic import BaseModel, Field
 from langchain_core.messages import BaseMessage
+from typing import Sequence
 
 
 class InMemoryHistory(BaseChatMessageHistory, BaseModel):
@@ -9,12 +10,17 @@ class InMemoryHistory(BaseChatMessageHistory, BaseModel):
     def get_messages(self) -> list[BaseMessage]:
         return self.messages
 
-    def get_lastest_message(self) -> BaseMessage:
+    def get_history_message(self) -> list[BaseMessage] | None:
+        if self.messages:
+            return self.messages[:-1]
+        return None
+
+    def get_lastest_message(self) -> BaseMessage | None:
         if self.messages:
             return self.messages[-1]
         return None
 
-    def add_messages(self, messages: list[BaseMessage]) -> None:
+    def add_messages(self, messages: Sequence[BaseMessage]) -> None:
         self.messages.extend(messages)
 
     def add_user_message(self, message):
