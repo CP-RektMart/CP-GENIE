@@ -23,3 +23,7 @@ poetry env activate
 poetry run start
 
 ```
+
+```bash
+
+```

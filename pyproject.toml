@@ -30,7 +30,9 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "lxml (>=5.4.0,<6.0.0)",
-    "psycopg2-binary (>=2.9.10,<3.0.0)"
+    "psycopg2-binary (>=2.9.10,<3.0.0)",
+    "pdf2image (>=1.17.0,<2.0.0)",
+    "pytesseract (>=0.3.13,<0.4.0)"
 ]
 
 [build-system]
