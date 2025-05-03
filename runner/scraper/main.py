@@ -11,6 +11,24 @@ import json
 from datetime import datetime
 import mimetypes
 
+# --- Load env variables ---
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from models import Base, Metadata
+from datetime import datetime
+
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Create engine and session
+engine = create_engine(DATABASE_URL)
+Session = sessionmaker(bind=engine)
+session = Session()
+
+# Create table if not exists
+Base.metadata.create_all(engine)
+
 # --- Configuration ---
 START_URL = "https://www.cp.eng.chula.ac.th/"
 BASE_DOMAIN = urlparse(START_URL).netloc
@@ -33,7 +51,7 @@ for directory in [HTML_DIR, PDF_DIR, IMAGES_DIR, OFFICE_DIR, TEXT_DIR, METADATA_
     os.makedirs(directory, exist_ok=True)
 
 # --- Politeness Delay ---
-DELAY = 2
+DELAY = 1.5
 
 # --- Set to keep track of visited URLs ---
 visited_urls = set()
@@ -108,14 +126,25 @@ def get_content_type_dir(content_type):
     return HTML_DIR
 
 
-def create_metadata(url, content_type, filepath):
+def create_metadata(url, last_mod, content_type, filepath):
     """Create metadata JSON for a file."""
     metadata = {
         "source_url": url,
         "content_type": content_type.split(";")[0].strip(),
+        "last_modified": last_mod, # take it as string for ez comparison
         "fetch_timestamp": datetime.now().isoformat(),
         "raw_filepath": filepath,
     }
+
+    record = Metadata(
+        source_url=metadata["source_url"],
+        content_type=metadata["content_type"],
+        last_modified=metadata["last_modified"],
+        fetch_timestamp=metadata["fetch_timestamp"],
+        raw_filepath=metadata["raw_filepath"],
+    )
+
+    session.merge(record)
 
     # Determine the base filename (without extension)
     filename = os.path.basename(filepath)
@@ -181,7 +210,7 @@ def extract_text_content(content, content_type):
     return ""
 
 
-def get_urls_from_sitemap(sitemap_url: str) -> List[str]:
+def get_urls_from_sitemap(sitemap_url: str) -> List[tuple[str, str]]:
     """Extract URLs from a sitemap.xml file"""
     try:
         response = requests.get(sitemap_url, timeout=15)
@@ -196,16 +225,33 @@ def get_urls_from_sitemap(sitemap_url: str) -> List[str]:
         urls = []
 
         # Check if this is a sitemap index
-        sitemaps = root.findall(".//sm:sitemap/sm:loc", ns)
+        sitemaps = root.findall(".//sm:sitemap", ns)
         if sitemaps:
             # This is a sitemap index, recursively process each sitemap
             for sitemap in sitemaps:
-                child_urls = get_urls_from_sitemap(sitemap.text)
+                loc = sitemap.find("sm:loc", ns)
+                lastmod = sitemap.find("sm:lastmod", ns)
+
+                if loc is None or lastmod is None:  
+                    print(f"Skipping sitemap without loc or lastmod: {sitemap.text}")
+                    continue
+
+                child_urls = get_urls_from_sitemap(loc.text)
                 urls.extend(child_urls)
         else:
             # This is a regular sitemap
-            for url in root.findall(".//sm:url/sm:loc", ns):
-                urls.append(url.text)
+            for url in root.findall(".//sm:url", ns):
+                loc = url.find("sm:loc", ns)
+                lastmod = url.find("sm:lastmod", ns)
+
+                if loc is None:
+                    print(f"Skipping URL without loc: {url.text}")
+                    continue
+                if lastmod is None:
+                    print(f"Skipping URL without lastmod: {url.text}")
+                    continue
+
+                urls.append((loc.text, lastmod.text))
 
         return urls
 
@@ -213,6 +259,13 @@ def get_urls_from_sitemap(sitemap_url: str) -> List[str]:
         print(f"Error processing sitemap {sitemap_url}: {e}")
         return []
 
+def get_exisiting_urls():
+    existing_metadata = {
+        m.source_url: m.last_modified
+        for m in session.query(Metadata.source_url, Metadata.last_modified).all()
+    }
+
+    return existing_metadata
 
 # Ignore these URLs (as regex patterns)
 IGNORE_URL_PATTERNS = [
@@ -240,10 +293,16 @@ IGNORE_URLS = [re.compile(pattern) for pattern in IGNORE_URL_PATTERNS]
 # --- Initialize the queue with the sitemap URLs ---
 sitemap_url = "https://www.cp.eng.chula.ac.th/sitemap.xml"
 queue = deque(get_urls_from_sitemap(sitemap_url))
+existing_metadata = get_exisiting_urls()
 
 # --- Main Scraping Loop ---
 while queue:
-    current_url = queue.popleft()
+    current_item = queue.popleft()
+    if current_item is None:
+        print("Skipping None item")
+
+    current_url = current_item[0]
+    current_lastmod = current_item[1]
 
     if current_url in visited_urls or any(
         re.match(ignore, current_url) for ignore in IGNORE_URLS
@@ -251,8 +310,15 @@ while queue:
         print(f"Skipping already visited or ignored URL: {current_url}")
         continue
 
-    print(f"Scraping: {current_url}")
     visited_urls.add(current_url)
+
+    db_lastmod = existing_metadata.get(current_url)
+
+    if db_lastmod and current_lastmod <= db_lastmod:
+        print(f"Skipping {current_url}: already up to date")
+        continue
+
+    print(f"Scraping: {current_url}")
 
     try:
         # --- Make the HTTP request ---
@@ -273,7 +339,7 @@ while queue:
         base_filename = url_to_filename(current_url)
         filename = f"{base_filename}{extension}"
 
-        # --- Determine which directory to save in based on content type ---
+        # --- Determine which directory to save in based on content type --- 8:43 - 9:08
         save_dir = get_content_type_dir(content_type)
         filepath = os.path.join(save_dir, filename)
 
@@ -283,7 +349,7 @@ while queue:
         print(f"  Saved raw content to: {filepath}")
 
         # --- Create metadata ---
-        metadata_path = create_metadata(current_url, content_type, filepath)
+        metadata_path = create_metadata(current_url, current_lastmod, content_type, filepath)
         print(f"  Created metadata at: {metadata_path}")
 
         # --- Extract and save text if possible ---
@@ -359,7 +425,7 @@ while queue:
 
     # --- Politeness delay ---
     time.sleep(DELAY)
-    # break  # Uncomment this line to continue scraping all URLs in the queue
+    # break # Uncomment this line to continue scraping all URLs in the queue
 
 # # Debugging output
 # print("-" * 20)
@@ -374,3 +440,9 @@ while queue:
 
 print("-" * 20)
 print(f"Scraping finished. Visited {len(visited_urls)} pages.")
+
+# close session
+session.commit()
+session.close()
+
+print("Data saved.")
