@@ -3,6 +3,7 @@ from fastapi import Request
 
 from cp_genie.domain.rag.normal import NormalRAG
 from cp_genie.domain.rag.agentic import AgenticRAG
+from cp_genie.domain.rag.contextual import ContextualRAG
 from cp_genie.api.v1.schema import ChatRequest, ChatResponse, MessageHistoryItem
 from cp_genie.infrastructure.chat_memory import get_by_session_id
 
@@ -11,6 +12,7 @@ router = APIRouter(tags=["chat"])
 RAG_CLASSES = {
     "normal": NormalRAG,
     "agentic": AgenticRAG,
+    "contextual": ContextualRAG,
 }
 
 
@@ -52,6 +54,8 @@ async def chat(
                 content=str(msg.content),
             )
         )
+    
+    
     return ChatResponse(
         answer=result["messages"][-1].content,
         history=history_items,

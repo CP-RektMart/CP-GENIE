@@ -84,7 +84,7 @@ class BaseRAG(ABC):
             "query": query,
         }
 
-        print("Invoking BaseRAG with initial state:", initial_state)
+        # print("Invoking BaseRAG with initial state:", initial_state)
 
         final_state = self.chain.invoke(initial_state)
         if final_state.get("messages"):  # Ensure messages exist

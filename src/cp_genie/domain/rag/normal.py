@@ -11,13 +11,22 @@ class NormalRAG(BaseRAG):
             [
                 (
                     "system",
-                    self.sys_prompt,
+                    self.sys_prompt
+                    + "\n\nAdditional Instructions: When responding to users, focus on providing accurate information from the retrieved context. Present information in a clear, structured manner. If the context doesn't contain relevant information, rely on your general knowledge while clearly indicating this distinction.",
                 ),
                 (
                     "human",
-                    "Retrieved context:\n\n{context}\n\n---\
-                    \n\nChat History:\n{messages}\n\n---\
-                    \n\nQuery: {query}\nPlease answer the query based on the context and history.",
+                    """# Retrieved Context
+                    
+{context}
+
+# Chat History
+{messages}
+
+# Current Query
+{query}
+
+Please answer the query based on the retrieved context and conversation history. Be precise and informative. If the retrieved context doesn't contain information directly relevant to the query, clearly state this and provide your best response based on general knowledge.""",
                 ),
             ]
         )
@@ -26,6 +35,7 @@ class NormalRAG(BaseRAG):
         def retrieve(state: State) -> dict:
             query = self.memory.get_lastest_message().content
             docs = self.retriever.invoke(query)
+            print(f"Type of docs: {type(docs)}")
             return {"context": docs}
 
         def generate(state: State) -> dict:
