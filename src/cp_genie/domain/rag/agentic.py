@@ -116,9 +116,6 @@ Please respond to the user's query based on the retrieved information and conver
                 # should not be here
                 query = "Answer that I don't know the answer."
 
-            print("\n--------Retrieved context----------\n")
-            print(retrieved_docs)
-            print("\n------------------\n")
             generation = combine_chain.invoke(
                 {
                     "messages": messages,
@@ -127,14 +124,6 @@ Please respond to the user's query based on the retrieved information and conver
                 }
             )
 
-            print("\n--------Retrieved context----------\n")
-            for i, doc in enumerate(retrieved_docs, start=1):
-                print(f"--- Document {i} ---")
-                print("Source:", doc.metadata.get("source", "N/A"))
-                print("Title:", doc.metadata.get("title", "N/A"))
-                print("Content preview:")
-                print(doc.page_content)
-                print()
             self.memory.add_ai_message(generation)
             return {"messages": [generation]}
 

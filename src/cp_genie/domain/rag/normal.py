@@ -35,7 +35,7 @@ Please answer the query based on the retrieved context and conversation history.
         def retrieve(state: State) -> dict:
             query = self.memory.get_lastest_message().content
             docs = self.retriever.invoke(query)
-            print(f"Type of docs: {type(docs)}")
+            (f"Type of docs: {type(docs)}")
             return {"context": docs}
 
         def generate(state: State) -> dict:
