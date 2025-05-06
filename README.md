@@ -6,7 +6,7 @@ A RAG-based chatbot system built with LangGraph, LangChain, and FastAPI.
 
 ## Installation
 
-Make sure you have **Python 3.11+** and [**Poetry**](https://python-poetry.org/) installed.
+Make sure you have **Python 3.11+** and [**Poetry**](https://python-poetry.org/), Tesseract 5.5.0 installed.
 
 ```bash
 # Clone the repo
