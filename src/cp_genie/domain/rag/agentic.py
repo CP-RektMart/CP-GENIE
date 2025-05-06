@@ -18,39 +18,80 @@ class AgenticRAG(BaseRAG):
             Retrieves information related to the input query
             from a vector database containing information
             on Computer Engineering at Chulalongkorn University.
-            Use this tool ONLY when the user asks a question that requires specific
-            knowledge about the university or department. Do not use for general conversation.
+
+            Use this tool when:
+            1. The user asks about specific university details, programs, or department information
+            2. The question requires factual knowledge about Chulalongkorn University
+            3. You need to verify information before responding
+            4. The user is asking about policies, procedures, or resources related to the university
+
+            Don't use this tool for:
+            1. General knowledge questions unrelated to the university
+            2. Simple greetings or conversation
+            3. Questions about topics outside of the university context
+            4. Personal opinions or subjective assessments
             """
-            docs = self.retriever.invoke(query)
-            return [d.page_content for d in docs]
+            return self.retriever.invoke(query)
 
         tools = [retrieve]
         tool_node = ToolNode(tools)
         llm_with_tools = self.llm.bind_tools(tools)
 
-        prompt = ChatPromptTemplate.from_messages(
+        agent_system_prompt = (
+            self.sys_prompt
+            + """
+## Tool Usage Guidelines
+When interacting with users, you have access to specialized tools to help provide accurate information:
+
+1. The retrieve tool lets you search for specific information about Chulalongkorn University and its Computer Engineering department.
+2. Use this tool strategically - only when the user's question requires specific university knowledge.
+3. When using the retrieve tool, formulate a clear, specific query focusing on the key information need.
+4. After retrieving information, integrate it smoothly into your response, maintaining your helpful personality.
+5. If the retrieved information doesn't fully answer the question, acknowledge this and provide the best response you can.
+
+Remember to maintain GIGI's warm, knowledgeable tone in all interactions.
+"""
+        )
+
+        generation_prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
-                    self.sys_prompt,
+                    self.sys_prompt
+                    + """\n\nAdditional Instructions: 
+When responding to the user after retrieving information, you should:
+1. Focus on answering the specific question using the retrieved information
+2. Structure your response in a clear, organized manner
+3. Acknowledge the source of the information (from university resources)
+4. If the retrieved information is incomplete or doesn't fully address the query, acknowledge this
+5. Stay true to GIGI's warm, knowledgeable personality
+""",
                 ),
                 (
                     "human",
-                    "Retrieved context:\n\n{context}\n\n---\
-                    \n\nChat History:\n{messages}\n\n---\
-                    \n\nQuery: {query}\n",
+                    """# Retrieved Information
+
+{context}
+
+# Conversation History
+{messages}
+
+# User's Query
+{query}
+
+Please respond to the user's query based on the retrieved information and conversation history. Maintain GIGI's persona and communication style throughout your response.""",
                 ),
             ]
         )
 
-        combine_chain = create_stuff_documents_chain(self.llm, prompt)
+        combine_chain = create_stuff_documents_chain(self.llm, generation_prompt)
 
         def agent(state: State) -> dict:
             current_messages = state["messages"]
             history = [
                 msg for msg in current_messages if not isinstance(msg, SystemMessage)
             ]
-            messages_for_llm = [SystemMessage(content=self.sys_prompt)] + history
+            messages_for_llm = [SystemMessage(content=agent_system_prompt)] + history
             response = llm_with_tools.invoke(messages_for_llm)
             return {"messages": [response]}
 
@@ -64,11 +105,7 @@ class AgenticRAG(BaseRAG):
                 )
 
             raw = last_message.content
-            retrieved_texts: List[str] = cast(List[str], raw)
-            if not isinstance(retrieved_texts, list) or not all(
-                isinstance(t, str) for t in retrieved_texts
-            ):
-                retrieved_texts = [str(retrieved_texts)]
+            retrieved_docs = [Document(page_content=str(raw))]
 
             query = ""
             for msg in reversed(messages[:-1]):
@@ -82,19 +119,11 @@ class AgenticRAG(BaseRAG):
             generation = combine_chain.invoke(
                 {
                     "messages": messages,
-                    "context": retrieved_texts,
+                    "context": retrieved_docs,
                     "query": query,
                 }
             )
 
-            # print("\n--------Retrieved context----------\n")
-            # for i, doc in enumerate(retrieved_docs, start=1):
-            #     print(f"--- Document {i} ---")
-            #     print("Source:", doc.metadata.get("source", "N/A"))
-            #     print("Title:", doc.metadata.get("title", "N/A"))
-            #     print("Content preview:")
-            #     print(doc.page_content)
-            #     print()
             self.memory.add_ai_message(generation)
             return {"messages": [generation]}
 
