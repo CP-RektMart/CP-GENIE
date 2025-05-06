@@ -14,17 +14,21 @@ from collections import deque
 
 from pdf2image import convert_from_path
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai import ChatVertexAI
 import pytesseract
 
 # --- Load env variables ---
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, Metadata
+from models import Base, Metadata, Text
 from datetime import datetime
 
+# --- Environment Variables ---
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
 
 # Create engine and session
 engine = create_engine(DATABASE_URL)
@@ -172,15 +176,24 @@ def extract_text_content(content, content_type, filepath):
         # Extract text from the main content area
         content_area = soup.select_one(CONTENT_SELECTOR)
         if content_area:
-            return content_area.get_text(separator="\n", strip=True)
+            content = content_area.get_text(separator="\n", strip=True)
+            record = Text(
+                source_path=filepath,
+                content=content,
+            )
+            session.merge(record)
+
+            return content                
+        
         return ""
     # # For PDF content
     elif content_type == "application/pdf":
         # PDF text extraction would require additional libraries (e.g., PyPDF2)
         # Placeholder for PDF extraction
 
-        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")
-        tesseract_lang = 'tha'
+        # llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")  
+        llm = ChatVertexAI(model="gemini-2.5-flash-preview-04-17", project=GOOGLE_PROJECT_ID)
+        tesseract_lang = "eng+tha"
         images = convert_from_path(filepath)
         ocr_result = ""
         for i, image in enumerate(images):
@@ -200,7 +213,13 @@ def extract_text_content(content, content_type, filepath):
         """
 
         result = llm.invoke(prompt)
-        return result
+        record = Text(
+            source_path=filepath,
+            content=result.content,
+        )
+        session.merge(record)
+        
+        return result.content
     # # For image content
     # elif content_type.startswith("image/"):
     #     # Image text extraction would require OCR (e.g., pytesseract)
@@ -301,27 +320,29 @@ IGNORE_URL_PATTERNS = [
     # Uncomment below to skip wp-content, pdfs, images, office docs
     # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*",
     # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.pdf",
-    # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(jpg|jpeg|png|gif|webp)",
+    r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(jpg|jpeg|png|gif|webp)",
     # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(doc|docx|xls|xlsx|ppt|pptx)",
 ]
 IGNORE_URLS = [re.compile(pattern) for pattern in IGNORE_URL_PATTERNS]
 
 # Test URLs
-# test_urls = [
+test_urls = [
 #     # "https://www.cp.eng.chula.ac.th/blog/archives/35393",
 #     # "https://www.cp.eng.chula.ac.th/blog/archives/48",
-#     ("https://www.cp.eng.chula.ac.th/blog/archives/34948", "2025-12-24T09:45:59+07:00"),
+    # ("https://www.cp.eng.chula.ac.th/blog/archives/34948", "2025-12-24T09:45:59+07:00"),
+    # ("https://www.cp.eng.chula.ac.th/wp-content/uploads/2020/06/img-211210948.pdf", "2025-12-24T09:45:59+07:00"),
 #     # "https://www.cp.eng.chula.ac.th/future/bachelor2018",
-# ]
-
-# queue = deque(test_urls)
+]
 
 # # --- Initialize the queue with the sitemap URLs ---
 sitemap_url = "https://www.cp.eng.chula.ac.th/sitemap.xml"
 queue = deque(get_urls_from_sitemap(sitemap_url))
+# queue = deque(test_urls)
 existing_metadata = get_exisiting_urls()
 
 # --- Main Scraping Loop ---
+batch_size = 20
+count = 0
 while queue:
     current_item = queue.popleft()
     if current_item is None:
@@ -341,7 +362,7 @@ while queue:
 
     db_lastmod = existing_metadata.get(current_url)
 
-    if db_lastmod and current_lastmod != db_lastmod:
+    if db_lastmod and current_lastmod == db_lastmod:
         print(f"Skipping {current_url}: already up to date")
         continue
 
@@ -452,6 +473,12 @@ while queue:
 
     # --- Politeness delay ---
     time.sleep(DELAY)
+
+    # --- Session Commit ---
+    count += 1
+    if count % batch_size == 0:
+        session.commit()
+        print(f"  Committed {batch_size} records to the database.")
     # break # Uncomment this line to continue scraping all URLs in the queue
 
 # # Debugging output
