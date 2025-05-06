@@ -12,15 +12,23 @@ from datetime import datetime
 import mimetypes
 from collections import deque
 
+from pdf2image import convert_from_path
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_vertexai import ChatVertexAI
+import pytesseract
+
 # --- Load env variables ---
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, Metadata
+from models import Base, Metadata, Text
 from datetime import datetime
 
+# --- Environment Variables ---
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
 
 # Create engine and session
 engine = create_engine(DATABASE_URL)
@@ -52,7 +60,7 @@ for directory in [HTML_DIR, PDF_DIR, IMAGES_DIR, OFFICE_DIR, TEXT_DIR, METADATA_
     os.makedirs(directory, exist_ok=True)
 
 # --- Politeness Delay ---
-DELAY = 1.5
+DELAY = 2
 
 # --- Set to keep track of visited URLs ---
 visited_urls = set()
@@ -160,7 +168,7 @@ def create_metadata(url, last_mod, content_type, filepath):
     return metadata_path
 
 
-def extract_text_content(content, content_type):
+def extract_text_content(content, content_type, filepath):
     """Extract text content from various types of content."""
     # For HTML content
     if content_type.startswith("text/html"):
@@ -168,13 +176,50 @@ def extract_text_content(content, content_type):
         # Extract text from the main content area
         content_area = soup.select_one(CONTENT_SELECTOR)
         if content_area:
-            return content_area.get_text(separator="\n", strip=True)
+            content = content_area.get_text(separator="\n", strip=True)
+            record = Text(
+                source_path=filepath,
+                content=content,
+            )
+            session.merge(record)
+
+            return content                
+        
         return ""
     # # For PDF content
-    # elif content_type == "application/pdf":
-    #     # PDF text extraction would require additional libraries (e.g., PyPDF2)
-    #     # Placeholder for PDF extraction
-    #     return "PDF content extraction not implemented."
+    elif content_type == "application/pdf":
+        # PDF text extraction would require additional libraries (e.g., PyPDF2)
+        # Placeholder for PDF extraction
+
+        # llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-001")  
+        llm = ChatVertexAI(model="gemini-2.5-flash-preview-04-17", project=GOOGLE_PROJECT_ID)
+        tesseract_lang = "eng+tha"
+        images = convert_from_path(filepath)
+        ocr_result = ""
+        for i, image in enumerate(images):
+            text = pytesseract.image_to_string(image, lang=tesseract_lang)
+            ocr_result += f"\n--- Page {i+1} ---\n{text}"
+
+        prompt = f"""
+        You are given a corrupted OCR result from a PDF form in Thai. The text contains many spacing issues, misread characters, and some non-standard symbols due to the OCR process.
+
+        Your task is to:
+        - Reconstruct the original Thai document to be readable.
+        - Fix spacing, punctuation, and character errors.
+        - Retain the structure and form of the original document (e.g., sections, numbered items).
+        - Keep the content in Thai and do **not** translate it to English.
+        Below is the OCR result. Please return the cleaned-up, readable version of the document:
+        {ocr_result}
+        """
+
+        result = llm.invoke(prompt)
+        record = Text(
+            source_path=filepath,
+            content=result.content,
+        )
+        session.merge(record)
+        
+        return result.content
     # # For image content
     # elif content_type.startswith("image/"):
     #     # Image text extraction would require OCR (e.g., pytesseract)
@@ -273,34 +318,37 @@ IGNORE_URL_PATTERNS = [
     r"^https://www\.cp\.eng\.chula\.ac\.th/blog/archives/category/.*",
     r"^https://www\.cp\.eng\.chula\.ac\.th/blog/archives/author/.*",
     # Uncomment below to skip wp-content, pdfs, images, office docs
-    r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*",
+    # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*",
     # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.pdf",
-    # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(jpg|jpeg|png|gif|webp)",
+    r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(jpg|jpeg|png|gif|webp)",
     # r"^https://www\.cp\.eng\.chula\.ac\.th/wp-content/.*\.(doc|docx|xls|xlsx|ppt|pptx)",
 ]
 IGNORE_URLS = [re.compile(pattern) for pattern in IGNORE_URL_PATTERNS]
 
-# # Test URLs
-# test_urls = [
-#     "https://www.cp.eng.chula.ac.th/blog/archives/35393",
-#     "https://www.cp.eng.chula.ac.th/blog/archives/48",
-#     "https://www.cp.eng.chula.ac.th/blog/archives/34948",
-#     "https://www.cp.eng.chula.ac.th/future/bachelor2018",
-# ]
+# Test URLs
+test_urls = [
+#     # "https://www.cp.eng.chula.ac.th/blog/archives/35393",
+#     # "https://www.cp.eng.chula.ac.th/blog/archives/48",
+    # ("https://www.cp.eng.chula.ac.th/blog/archives/34948", "2025-12-24T09:45:59+07:00"),
+    # ("https://www.cp.eng.chula.ac.th/wp-content/uploads/2020/06/img-211210948.pdf", "2025-12-24T09:45:59+07:00"),
+#     # "https://www.cp.eng.chula.ac.th/future/bachelor2018",
+]
 
-# queue = deque(test_urls)
-
-# --- Initialize the queue with the sitemap URLs ---
+# # --- Initialize the queue with the sitemap URLs ---
 sitemap_url = "https://www.cp.eng.chula.ac.th/sitemap.xml"
 queue = deque(get_urls_from_sitemap(sitemap_url))
+# queue = deque(test_urls)
 existing_metadata = get_exisiting_urls()
 
 # --- Main Scraping Loop ---
+batch_size = 20
+count = 0
 while queue:
     current_item = queue.popleft()
     if current_item is None:
         print("Skipping None item")
 
+    # print(current_item)
     current_url = current_item[0]
     current_lastmod = current_item[1]
 
@@ -314,7 +362,7 @@ while queue:
 
     db_lastmod = existing_metadata.get(current_url)
 
-    if db_lastmod and current_lastmod <= db_lastmod:
+    if db_lastmod and current_lastmod == db_lastmod:
         print(f"Skipping {current_url}: already up to date")
         continue
 
@@ -353,7 +401,7 @@ while queue:
         print(f"  Created metadata at: {metadata_path}")
 
         # --- Extract and save text if possible ---
-        text_content = extract_text_content(response.content, content_type)
+        text_content = extract_text_content(response.content, content_type, filepath)
         if text_content:
             text_filepath = os.path.join(TEXT_DIR, f"{base_filename}.txt")
             with open(text_filepath, "w", encoding="utf-8") as f:
@@ -381,7 +429,7 @@ while queue:
                         and "#" not in absolute_url
                     ):
                         if absolute_url not in queue:
-                            queue.append(absolute_url)
+                            queue.append((absolute_url, current_lastmod))
 
                 # # Extract URLs from image tags
                 # for img in content_area.find_all("img", src=True):
@@ -397,26 +445,26 @@ while queue:
                 #         if absolute_url not in queue:
                 #             queue.append(absolute_url)
 
-                # # Extract URLs from other resource tags (source, link, iframe, etc.)
-                # for tag in content_area.find_all(["source", "link", "iframe"]):
-                #     # Check for src or href attributes
-                #     url_attr = None
-                #     if tag.has_attr("src"):
-                #         url_attr = tag["src"]
-                #     elif tag.has_attr("href"):
-                #         url_attr = tag["href"]
+                # Extract URLs from other resource tags (source, link, iframe, etc.)
+                for tag in content_area.find_all(["source", "link", "iframe"]):
+                    # Check for src or href attributes
+                    url_attr = None
+                    if tag.has_attr("src"):
+                        url_attr = tag["src"]
+                    elif tag.has_attr("href"):
+                        url_attr = tag["href"]
 
-                #     if url_attr:
-                #         absolute_url = urljoin(current_url, url_attr)
-                #         parsed_url = urlparse(absolute_url)
+                    if url_attr:
+                        absolute_url = urljoin(current_url, url_attr)
+                        parsed_url = urlparse(absolute_url)
 
-                #         if (
-                #             parsed_url.scheme in ["http", "https"]
-                #             and parsed_url.netloc == BASE_DOMAIN
-                #             and absolute_url not in visited_urls
-                #         ):
-                #             if absolute_url not in queue:
-                #                 queue.append(absolute_url)
+                        if (
+                            parsed_url.scheme in ["http", "https"]
+                            and parsed_url.netloc == BASE_DOMAIN
+                            and absolute_url not in visited_urls
+                        ):
+                            if absolute_url not in queue:
+                                queue.append((absolute_url, current_lastmod))
 
     except requests.exceptions.RequestException as e:
         print(f"  Error fetching {current_url}: {e}")
@@ -425,6 +473,12 @@ while queue:
 
     # --- Politeness delay ---
     time.sleep(DELAY)
+
+    # --- Session Commit ---
+    count += 1
+    if count % batch_size == 0:
+        session.commit()
+        print(f"  Committed {batch_size} records to the database.")
     # break # Uncomment this line to continue scraping all URLs in the queue
 
 # # Debugging output
