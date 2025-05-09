@@ -16,8 +16,12 @@ RAG_CLASSES = {
 }
 
 
-def get_retriever(req: Request) -> str:
-    return req.app.state.retriever
+def get_retriever_fac(req: Request) -> str:
+    return req.app.state.retriever_fac_reranked
+
+
+def get_retriever_oth(req: Request) -> str:
+    return req.app.state.retriever_oth_reranked
 
 
 def get_llm(req: Request) -> str:
@@ -29,7 +33,8 @@ async def chat(
     rag_type: str,
     session_id: str,
     chatrequest: ChatRequest,
-    retriever: str = Depends(get_retriever),
+    retriever_fac: str = Depends(get_retriever_fac),
+    retriever_oth: str = Depends(get_retriever_oth),
     llm: str = Depends(get_llm),
 ) -> ChatResponse:
 
@@ -42,7 +47,7 @@ async def chat(
 
     rag_class = RAG_CLASSES[rag_type]
     memory = get_by_session_id(session_id)
-    chain = rag_class(llm, retriever, memory)
+    chain = rag_class(llm, retriever_fac, retriever_oth, memory)
     result = chain.invoke(chatrequest.query)
     history = memory.get_messages()
 
@@ -54,8 +59,7 @@ async def chat(
                 content=str(msg.content),
             )
         )
-    
-    
+
     return ChatResponse(
         answer=result["messages"][-1].content,
         history=history_items,
