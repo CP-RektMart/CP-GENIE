@@ -93,8 +93,6 @@ Please respond to the user's query based on the retrieved information and conver
 
             raw = last_message.content
             docs = [Document(page_content=raw)]
-            print("Retrieved context:", raw)
-            print("\n\nDocs:", docs)
             query = ""
             for msg in reversed(messages[:-1]):
                 if isinstance(msg, HumanMessage):
