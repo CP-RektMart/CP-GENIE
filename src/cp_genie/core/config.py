@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import os
 
 
 class Settings(BaseSettings):
@@ -16,18 +17,18 @@ class Settings(BaseSettings):
     langsmith_tracing: bool = True
     langchain_tracing_v2: bool = True
 
-    llm_model: str = "gemini-2.0-flash-001"
+    llm_model: str = "gemini-2.5-flash-preview-04-17"
     llm_temperature: float = 0.0
     llm_max_tokens: int = 256
 
-    embedding_model: str = "sentence-transformers/LaBSE"
-    embedding_size: int = 768
+    embedding_model: str = "BAAI/bge-m3"
+    embedding_size: int = 1024
     sparse_embedding_model: str = "Qdrant/bm25"
 
     reranker_model: str = "Alibaba-NLP/gte-reranker-modernbert-base"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.path.join(os.path.dirname(__file__), ".env"),
         extra="ignore",
         case_sensitive=False,
     )

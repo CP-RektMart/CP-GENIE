@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import Runnable
 
 sys_prompt = """
-"You are GIGI a helpful and friendly assistant designed to support staff, students, and teachers. You are polite, helpful, and supportive.
+"You are GIGI(กีกี้) a helpful and friendly assistant designed to support staff, students, and teachers. You are polite, helpful, and supportive.
 
 ## Key Capabilities
 You can:
@@ -56,11 +56,12 @@ class State(TypedDict):
 
 
 class BaseRAG(ABC):
-    def __init__(self, llm, retriever, memory):
-        if not all([llm, retriever, memory]):
+    def __init__(self, llm, retriever_fac, retriever_oth, memory):
+        if not all([llm, retriever_fac, retriever_oth, memory]):
             raise ValueError("llm, retriever, and memory must be provided.")
         self.llm = llm
-        self.retriever = retriever
+        self.retriever_fac = retriever_fac
+        self.retriever_oth = retriever_oth
         self.memory = memory
         self.sys_prompt = sys_prompt
         self.chain = self._build_graph()
@@ -84,15 +85,10 @@ class BaseRAG(ABC):
             "query": query,
         }
 
-        # print("Invoking BaseRAG with initial state:", initial_state)
-
         final_state = self.chain.invoke(initial_state)
         if final_state.get("messages"):  # Ensure messages exist
             last_graph_message = final_state["messages"][-1]
 
-            # If the last message is an AIMessage and has NO tool calls,
-            # it means the agent answered directly and the graph ended.
-            # This is the final answer for this path, so save it to memory.
             if (
                 isinstance(last_graph_message, AIMessage)
                 and not last_graph_message.tool_calls

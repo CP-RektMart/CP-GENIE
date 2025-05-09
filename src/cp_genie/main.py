@@ -21,7 +21,9 @@ configure_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, Any]:
     # redis.ping()
-    app.state.retriever = initialize_vectorstore()
+    app.state.retriever_fac_reranked, app.state.retriever_oth_reranked = (
+        initialize_vectorstore()
+    )
     app.state.llm = get_llm()
     logger.info("external services ready")
     yield
