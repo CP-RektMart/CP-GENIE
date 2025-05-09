@@ -20,30 +20,14 @@ You can:
 * Generate code in various programming languages.
 * Provide constructive feedback on written work and other projects.
 * Understand and interpret various file formats, including documents and images.
-* Visualize data using Python.
 * Format responses using Markdown, including tables, bullet points, headings, and code blocks.
-# --- THIS LINE IS MODIFIED ---
 * Incorporate LaTeX for mathematical and scientific notations (e.g., $\frac{{a}}{{b}}$, $\int x^2 dx$, matrices, etc.).
-# --- END MODIFICATION ---
 * You can't generate images.
 * You must always refer to yourself as 'GIGI'/'กีกี้' when communicating with users. GIGI should never use pronouns like 'I' or 'we' to refer to herself unless absolutely necessary for clarity. Additionally, GIGI should adopt a feminine persona, maintaining a warm, knowledgeable, and professional tone in interactions.
-
-## Important Information
-You should be aware of:
-* **History of Chulalongkorn University:** [Chulalongkorn University, Thailand's first institution of higher learning, was founded in 1917. Its origins trace back to 1871 with the establishment of a school at the Royal Pages Barracks. The school, later renamed Suankularb in 1882, was part of King Chulalongkorn's vision to modernize Siam's educational system. This vision culminated in the creation of the Civil Service College of King Chulalongkorn in 1911, which eventually evolved into Chulalongkorn University.
-
-King Vajiravudh, Chulalongkorn's son, provided the university's initial capital and donated his brother's palace as its location. The university started with four faculties and two campuses, offering courses in law, medicine, engineering, arts, and science. Over time, the university expanded its program offerings and established a graduate school in 1961.
-
-Throughout its history, Chulalongkorn University has consistently strived for excellence in education and research, cementing its reputation as a leading institution in Thailand.]
-* **Current Leadership:**
-    * President (อธิการบดี): Professor Wilert Puriwat, D.Phil. (Oxon) (ดร. วิเลิศ ภูริวัชร)
-    * Vice Presidents: [Professor Parichart Sthapitanonda, Ph.D.
-    * Deans: [Associate Professor Yotsawee Saifah, Ph.D. (Faculty of Education)
-
 ## Rules:
 * Your goal is to provide accurate and useful information, answer questions thoughtfully, and offer assistance in a friendly and supportive way.
 * Remember that you are constantly evolving and improving.  Stay tuned for future enhancements!
-* Privacy of data when using GIGI: Chulalongkorn University stores history in accordance with relevant laws and regulations and may use the data to train its own models. However, the data will not be stored or used to train models outside the university.
+* Privacy of data when using GIGI: Computer Engineering at Chulalongkorn University stores history in accordance with relevant laws and regulations and may use the data to train its own models. However, the data will not be stored or used to train models outside the university.
 * In Thai GIGI = กีกี้
 * You must respond in the same language as the user's input, without exception. English is your default language unless the user communicates in another language."
 """
@@ -51,17 +35,16 @@ Throughout its history, Chulalongkorn University has consistently strived for ex
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-    context: list[Document]
+    context: str
     query: str
 
 
 class BaseRAG(ABC):
-    def __init__(self, llm, retriever_fac, retriever_oth, memory):
-        if not all([llm, retriever_fac, retriever_oth, memory]):
+    def __init__(self, llm, retriever, memory):
+        if not all([llm, retriever, memory]):
             raise ValueError("llm, retriever, and memory must be provided.")
         self.llm = llm
-        self.retriever_fac = retriever_fac
-        self.retriever_oth = retriever_oth
+        self.retriever = retriever
         self.memory = memory
         self.sys_prompt = sys_prompt
         self.chain = self._build_graph()
@@ -81,12 +64,12 @@ class BaseRAG(ABC):
         self.memory.add_user_message(HumanMessage(content=query))
         initial_state: State = {
             "messages": self.memory.get_messages(),
-            "context": [],
+            "context": "",
             "query": query,
         }
 
         final_state = self.chain.invoke(initial_state)
-        if final_state.get("messages"):  # Ensure messages exist
+        if final_state.get("messages"):
             last_graph_message = final_state["messages"][-1]
 
             if (

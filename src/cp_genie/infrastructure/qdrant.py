@@ -7,9 +7,14 @@ from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain.retrievers import ContextualCompressionRetriever
 
 settings = Settings()
-client = QdrantClient(
-    url=settings.qdrant_url,
-    api_key=settings.qdrant_api_key,
+client_naive = QdrantClient(
+    url=settings.qdrant_url_naive,
+    api_key=settings.qdrant_api_key_naive,
+)
+
+client_contextual = QdrantClient(
+    url=settings.qdrant_url_contextual,
+    api_key=settings.qdrant_api_key_contextual,
 )
 
 embeddings = HuggingFaceEmbeddings(model_name=settings.embedding_model)
@@ -18,10 +23,19 @@ reranker_model = HuggingFaceCrossEncoder(model_name=settings.reranker_model)
 
 
 def initialize_vectorstore():
-    print(settings.qdrant_url)
-    print(settings.qdrant_api_key)
+
+    naive_qdrant = QdrantVectorStore(
+        client=client_naive,
+        collection_name="cp-genie-2",
+        embedding=embeddings,
+        sparse_embedding=sparse_embeddings,
+        retrieval_mode=RetrievalMode.HYBRID,
+        vector_name="dense",
+        sparse_vector_name="sparse",
+    )
+
     faculty_qdrant = QdrantVectorStore(
-        client=client,
+        client=client_contextual,
         collection_name="cp-genie-faculty-info",
         embedding=embeddings,
         sparse_embedding=sparse_embeddings,
@@ -31,7 +45,7 @@ def initialize_vectorstore():
     )
 
     other_qdrant = QdrantVectorStore(
-        client=client,
+        client=client_contextual,
         collection_name="cp-genie-other-info",
         embedding=embeddings,
         sparse_embedding=sparse_embeddings,
@@ -40,10 +54,16 @@ def initialize_vectorstore():
         sparse_vector_name="sparse",
     )
 
-    reranker = CrossEncoderReranker(model=reranker_model, top_n=5)
-
+    retriever_naive = naive_qdrant.as_retriever(search_type="similarity", k=10)
     retriever_fac = faculty_qdrant.as_retriever(search_type="similarity", k=10)
     retriever_oth = other_qdrant.as_retriever(search_type="similarity", k=10)
+
+    reranker = CrossEncoderReranker(model=reranker_model, top_n=10)
+
+    retriever_naive_reranked = ContextualCompressionRetriever(
+        base_retriever=retriever_naive, base_compressor=reranker
+    )
+
     retriever_fac_reranked = ContextualCompressionRetriever(
         base_retriever=retriever_fac, base_compressor=reranker
     )
@@ -51,4 +71,4 @@ def initialize_vectorstore():
     retriever_oth_reranked = ContextualCompressionRetriever(
         base_retriever=retriever_oth, base_compressor=reranker
     )
-    return retriever_fac_reranked, retriever_oth_reranked
+    return retriever_naive_reranked, retriever_fac_reranked, retriever_oth_reranked

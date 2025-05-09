@@ -35,7 +35,6 @@ Please answer the query based on the retrieved context and conversation history.
         def retrieve(state: State) -> dict:
             query = self.memory.get_lastest_message().content
             docs = self.retriever.invoke(query)
-            (f"Type of docs: {type(docs)}")
             return {"context": docs}
 
         def generate(state: State) -> dict:
@@ -43,7 +42,7 @@ Please answer the query based on the retrieved context and conversation history.
             result = combine_chain.invoke(
                 {
                     "messages": self.memory.get_history_message(),
-                    "context": state.get("context", []),
+                    "context": state.get("context", ""),
                     "query": query,
                 }
             )
@@ -59,4 +58,4 @@ Please answer the query based on the retrieved context and conversation history.
         graph.add_edge("retrieve", "generate")
         graph.add_edge("generate", END)
 
-        return graph.compile()  # type: ignore[return-value]
+        return graph.compile()
