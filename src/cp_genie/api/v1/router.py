@@ -4,6 +4,7 @@ from fastapi import Request
 from cp_genie.domain.rag.normal import NormalRAG
 from cp_genie.domain.rag.agentic import AgenticRAG
 from cp_genie.domain.rag.contextual_naive import ContextualNaiveRAG
+from cp_genie.domain.rag.contextual_agentic import ContextualAgenticRAG
 
 from cp_genie.api.v1.schema import ChatRequest, ChatResponse, MessageHistoryItem
 from cp_genie.infrastructure.chat_memory import get_by_session_id
@@ -17,7 +18,7 @@ RAG_CLASSES_NAIVE = {
 
 RAG_CLASSES_CONTEXTUAL = {
     "naive": ContextualNaiveRAG,
-    # "agentic": ContextualAgenticRAG,
+    "agentic": ContextualAgenticRAG,
 }
 
 
