@@ -9,10 +9,11 @@ class Settings(BaseSettings):
 
     langsmith_api_key: str = ""
 
-    qdrant_url: str = "http://localhost:6333"
-    qdrant_api_key: str = ""
-    qdrant_collection_name: str = "cp_genie"
-    redis_url: str = "redis://localhost:6379"
+    qdrant_url_naive: str = "http://localhost:6333"
+    qdrant_api_key_naive: str = ""
+
+    qdrant_url_contextual: str = "http://localhost:6333"
+    qdrant_api_key_contextual: str = ""
 
     langsmith_tracing: bool = True
     langchain_tracing_v2: bool = True
@@ -25,7 +26,9 @@ class Settings(BaseSettings):
     embedding_size: int = 1024
     sparse_embedding_model: str = "Qdrant/bm25"
 
-    reranker_model: str = "Alibaba-NLP/gte-reranker-modernbert-base"
+    reranker_model: str = ""
+
+    google_application_credentials: str = ""
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(__file__), ".env"),

@@ -10,7 +10,7 @@ from cp_genie.core.logger import configure_logging
 from cp_genie.infrastructure.llm import get_llm
 
 # from cp_genie.infrastructure.redis import redis
-from cp_genie.infrastructure.qdrant import client
+from cp_genie.infrastructure.qdrant import client_naive, client_contextual
 from cp_genie.infrastructure.qdrant import initialize_vectorstore
 
 
@@ -21,13 +21,16 @@ configure_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[Any, Any]:
     # redis.ping()
-    app.state.retriever_fac_reranked, app.state.retriever_oth_reranked = (
-        initialize_vectorstore()
-    )
+    (
+        app.state.retriever_naive_reranked,
+        app.state.retriever_fac_reranked,
+        app.state.retriever_oth_reranked,
+    ) = initialize_vectorstore()
     app.state.llm = get_llm()
     logger.info("external services ready")
     yield
-    client.close()
+    client_naive.close()
+    client_contextual.close()
     # redis.close()
 
 
