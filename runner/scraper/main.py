@@ -13,7 +13,6 @@ import mimetypes
 from collections import deque
 
 from pdf2image import convert_from_path
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_google_vertexai import ChatVertexAI
 import pytesseract
 
@@ -21,11 +20,11 @@ import pytesseract
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, Metadata, Text
+from models import Base, Metadata, Content
 from datetime import datetime
 
 # --- Environment Variables ---
-load_dotenv()
+load_dotenv(override=True)
 DATABASE_URL = os.getenv("DATABASE_URL")
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 GOOGLE_PROJECT_ID = os.getenv("GOOGLE_PROJECT_ID")
@@ -60,12 +59,10 @@ for directory in [HTML_DIR, PDF_DIR, IMAGES_DIR, OFFICE_DIR, TEXT_DIR, METADATA_
     os.makedirs(directory, exist_ok=True)
 
 # --- Politeness Delay ---
-DELAY = 2
+DELAY = 0.5
 
 # --- Set to keep track of visited URLs ---
 visited_urls = set()
-
-# --- Queue for URLs to scrape ---
 
 # --- Content type mapping ---
 CONTENT_TYPE_DIRS = {
@@ -82,7 +79,6 @@ CONTENT_TYPE_DIRS = {
     "image/gif": IMAGES_DIR,
     "image/webp": IMAGES_DIR,
 }
-
 
 def url_to_filename(url):
     """Convert URL to a filename by replacing slashes with double underscores and removing illegal chars."""
@@ -112,7 +108,6 @@ def url_to_filename(url):
 
     return f"{filename}__{url_hash}"
 
-
 def get_content_type_dir(content_type):
     """Determine the appropriate directory based on content type."""
     # Get the base content type (ignore parameters)
@@ -132,7 +127,6 @@ def get_content_type_dir(content_type):
 
     # Default to HTML for unknown types
     return HTML_DIR
-
 
 def create_metadata(url, last_mod, content_type, filepath):
     """Create metadata JSON for a file."""
@@ -167,7 +161,6 @@ def create_metadata(url, last_mod, content_type, filepath):
 
     return metadata_path
 
-
 def extract_text_content(content, content_type, filepath):
     """Extract text content from various types of content."""
     # For HTML content
@@ -177,9 +170,11 @@ def extract_text_content(content, content_type, filepath):
         content_area = soup.select_one(CONTENT_SELECTOR)
         if content_area:
             content = content_area.get_text(separator="\n", strip=True)
-            record = Text(
+            record = Content(
                 source_path=filepath,
                 content=content,
+                content_type=content_type.split(";")[0].strip(),
+                last_modified=datetime.now(),
             )
             session.merge(record)
 
@@ -204,18 +199,28 @@ def extract_text_content(content, content_type, filepath):
         You are given a corrupted OCR result from a PDF form in Thai. The text contains many spacing issues, misread characters, and some non-standard symbols due to the OCR process.
 
         Your task is to:
+        - Generating based on original Text only withou any additional information.
         - Reconstruct the original Thai document to be readable.
         - Fix spacing, punctuation, and character errors.
+        - Parse the following markdown table and output the data as a list of objects (or similar structure) where each object represents a row. The keys of each object should be the header names, and the values should be the corresponding cell data for that row.
+          Example of the expected output format:[Header1: DataA1, Header2: DataA2, Header3: DataA3], then replace to the location of original markdown table.
         - Retain the structure and form of the original document (e.g., sections, numbered items).
         - Keep the content in Thai and do **not** translate it to English.
         Below is the OCR result. Please return the cleaned-up, readable version of the document:
         {ocr_result}
         """
 
+        # print(f"ocr_result: {ocr_result}")
+
         result = llm.invoke(prompt)
-        record = Text(
+
+        # print(f"result: {result}")
+
+        record = Content(
             source_path=filepath,
-            content=result.content,
+            content=content,
+            content_type=content_type,
+            last_modified=datetime.now(),
         )
         session.merge(record)
         
@@ -253,7 +258,6 @@ def extract_text_content(content, content_type, filepath):
 
     # For other types, return empty string (text extraction would require additional libraries)
     return ""
-
 
 def get_urls_from_sitemap(sitemap_url: str) -> List[tuple[str, str]]:
     """Extract URLs from a sitemap.xml file"""
@@ -312,6 +316,14 @@ def get_exisiting_urls():
 
     return existing_metadata
 
+def get_existing_pdf():
+    existing_pdf = [
+        (m.source_url, m.last_modified)
+        for m in session.query(Metadata.source_url, Metadata.last_modified).filter(Metadata.content_type == "application/pdf").all()
+    ]
+
+    return existing_pdf
+
 # Ignore these URLs (as regex patterns)
 IGNORE_URL_PATTERNS = [
     r"^https://www\.cp\.eng\.chula\.ac\.th/blog/archives/tag/.*",
@@ -326,22 +338,23 @@ IGNORE_URL_PATTERNS = [
 IGNORE_URLS = [re.compile(pattern) for pattern in IGNORE_URL_PATTERNS]
 
 # Test URLs
-test_urls = [
+# test_urls = [
 #     # "https://www.cp.eng.chula.ac.th/blog/archives/35393",
 #     # "https://www.cp.eng.chula.ac.th/blog/archives/48",
     # ("https://www.cp.eng.chula.ac.th/blog/archives/34948", "2025-12-24T09:45:59+07:00"),
     # ("https://www.cp.eng.chula.ac.th/wp-content/uploads/2020/06/img-211210948.pdf", "2025-12-24T09:45:59+07:00"),
 #     # "https://www.cp.eng.chula.ac.th/future/bachelor2018",
-]
+# ]
 
 # # --- Initialize the queue with the sitemap URLs ---
 sitemap_url = "https://www.cp.eng.chula.ac.th/sitemap.xml"
-queue = deque(get_urls_from_sitemap(sitemap_url))
-# queue = deque(test_urls)
-existing_metadata = get_exisiting_urls()
+# queue = deque(get_urls_from_sitemap(sitemap_url))
+queue = deque(get_existing_pdf())
+# existing_metadata = get_exisiting_urls()
+existing_metadata = {}
 
 # --- Main Scraping Loop ---
-batch_size = 20
+batch_size = 2
 count = 0
 while queue:
     current_item = queue.popleft()
