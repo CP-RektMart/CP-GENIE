@@ -42,8 +42,6 @@ class State(TypedDict):
 
 class BaseRAG(ABC):
     def __init__(self, llm, retriever, memory):
-        if not all([llm, retriever, memory]):
-            raise ValueError("llm, retriever, and memory must be provided.")
         self.llm = llm
         self.retriever = retriever
         self.memory = memory
@@ -80,3 +78,10 @@ class BaseRAG(ABC):
                 if last_graph_message.content:
                     self.memory.add_ai_message(last_graph_message)
         return final_state
+
+
+class ContextualRAG(BaseRAG):
+    def __init__(self, llm, retriever_fac, retriever_oth, memory):
+        self.retriever_fac = retriever_fac
+        self.retriever_oth = retriever_oth
+        super().__init__(llm, retriever=None, memory=memory)

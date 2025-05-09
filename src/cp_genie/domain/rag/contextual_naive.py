@@ -2,10 +2,10 @@ from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableLambda
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from cp_genie.domain.rag.base import State, BaseRAG
+from cp_genie.domain.rag.base import State, ContextualRAG
 
 
-class ContextualRAG(BaseRAG):
+class ContextualNaiveRAG(ContextualRAG):
     def _build_graph(self) -> StateGraph:
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -44,7 +44,7 @@ Please answer the query based on the retrieved context and conversation history.
             result = combine_chain.invoke(
                 {
                     "messages": self.memory.get_history_message(),
-                    "context": state.get("context", []),
+                    "context": state.get("context", ""),
                     "query": query,
                 }
             )
@@ -60,4 +60,4 @@ Please answer the query based on the retrieved context and conversation history.
         graph.add_edge("retrieve", "generate")
         graph.add_edge("generate", END)
 
-        return graph.compile()  # type: ignore[return-value]
+        return graph.compile()
