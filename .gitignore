@@ -6,4 +6,8 @@ venv/
 data/
 system.txt
 **/*_cache/
+<<<<<<< Updated upstream
 service-account-key.json
+=======
+google_credentials.json
+>>>>>>> Stashed changes
