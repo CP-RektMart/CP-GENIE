@@ -18,20 +18,12 @@ class AgenticRAG(BaseRAG):
             Retrieves information related to the input query
             from a vector database containing information
             on Computer Engineering at Chulalongkorn University.
-
-            Use this tool when:
-            1. The user asks about specific university details, programs, or department information
-            2. The question requires factual knowledge about Chulalongkorn University
-            3. You need to verify information before responding
-            4. The user is asking about policies, procedures, or resources related to the university
-
-            Don't use this tool for:
-            1. General knowledge questions unrelated to the university
-            2. Simple greetings or conversation
-            3. Questions about topics outside of the university context
-            4. Personal opinions or subjective assessments
             """
-            return self.retriever.invoke(query)
+            retrieved_docs = self.retriever.invoke(query)
+            serialized = "\n\n".join(
+                (f"Context: {doc.page_content}") for doc in retrieved_docs
+            )
+            return serialized
 
         tools = [retrieve]
         tool_node = ToolNode(tools)
@@ -44,12 +36,7 @@ class AgenticRAG(BaseRAG):
 When interacting with users, you have access to specialized tools to help provide accurate information:
 
 1. The retrieve tool lets you search for specific information about Chulalongkorn University and its Computer Engineering department.
-2. Use this tool strategically - only when the user's question requires specific university knowledge.
-3. When using the retrieve tool, formulate a clear, specific query focusing on the key information need.
-4. After retrieving information, integrate it smoothly into your response, maintaining your helpful personality.
-5. If the retrieved information doesn't fully answer the question, acknowledge this and provide the best response you can.
-
-Remember to maintain GIGI's warm, knowledgeable tone in all interactions.
+2. Usetone in all interactions.
 """
         )
 
@@ -105,8 +92,9 @@ Please respond to the user's query based on the retrieved information and conver
                 )
 
             raw = last_message.content
-            retrieved_docs = [Document(page_content=str(raw))]
-
+            docs = [Document(page_content=raw)]
+            print("Retrieved context:", raw)
+            print("\n\nDocs:", docs)
             query = ""
             for msg in reversed(messages[:-1]):
                 if isinstance(msg, HumanMessage):
@@ -119,7 +107,7 @@ Please respond to the user's query based on the retrieved information and conver
             generation = combine_chain.invoke(
                 {
                     "messages": messages,
-                    "context": retrieved_docs,
+                    "context": docs,
                     "query": query,
                 }
             )

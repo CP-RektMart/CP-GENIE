@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from langgraph.graph import StateGraph
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import Runnable
+from typing import List
 
 sys_prompt = """
 "You are GIGI(กีกี้) a helpful and friendly assistant designed to support staff, students, and teachers. You are polite, helpful, and supportive.
@@ -35,7 +36,7 @@ You can:
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
-    context: str
+    context: List[Document] | str
     query: str
 
 

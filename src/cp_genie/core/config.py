@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     google_api_key: str = ""
 
-    langsmith_api_key: str = ""
+    # langsmith_api_key: str = ""
 
     qdrant_url_naive: str = "http://localhost:6333"
     qdrant_api_key_naive: str = ""
@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     qdrant_url_contextual: str = "http://localhost:6333"
     qdrant_api_key_contextual: str = ""
 
-    langsmith_tracing: bool = True
-    langchain_tracing_v2: bool = True
+    # langsmith_tracing: bool = True
+    # langchain_tracing_v2: bool = True
 
     llm_model: str = "gemini-2.5-flash-preview-04-17"
     llm_temperature: float = 0.0
