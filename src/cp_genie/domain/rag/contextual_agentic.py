@@ -18,7 +18,6 @@ class ContextualAgenticRAG(ContextualRAG):
             ใช้สำหรับค้นหาข้อมูลพื้นฐานเกี่ยวกับอาจารย์ในภาควิชาวิศวกรรมคอมพิวเตอร์ หรือ จุฬาลงกรณ์มหาวิทยาลัย
             เช่น ชื่อ-นามสกุล ตำแหน่งทางวิชาการ วุฒิการศึกษา ภาควิชา หรือประวัติการสอน
             """
-            print("Calling retrieve_fac")
             retrieved_docs = self.retriever_fac.invoke(query)
             serialized = "\n\n".join(
                 (f"Context: {doc.page_content}") for doc in retrieved_docs
@@ -32,7 +31,6 @@ class ContextualAgenticRAG(ContextualRAG):
             เช่น งานวิจัยของอาจารย์ บทความวิชาการ ข่าวกิจกรรม งานบริการวิชาการ หรือรางวัลต่าง ๆ
             """
 
-            print("Calling retrieve_oth")
             retrieved_docs = self.retriever_oth.invoke(query)
             serialized = "\n\n".join(
                 (f"Context: {doc.page_content}") for doc in retrieved_docs
@@ -107,8 +105,6 @@ Please respond to the user's query based on the retrieved information and conver
 
             raw = last_message.content
             docs = [Document(page_content=raw)]
-            print("Retrieved context:", raw)
-            print("\n\nDocs:", docs)
             query = ""
             for msg in reversed(messages[:-1]):
                 if isinstance(msg, HumanMessage):

@@ -33,7 +33,8 @@ dependencies = [
     "psycopg2-binary (>=2.9.10,<3.0.0)",
     "pdf2image (>=1.17.0,<2.0.0)",
     "pytesseract (>=0.3.13,<0.4.0)",
-    "langchain-google-vertexai (>=2.0.23,<3.0.0)"
+    "langchain-google-vertexai (>=2.0.23,<3.0.0)",
+    "streamlit (>=1.45.0,<2.0.0)"
 ]
 
 [build-system]
@@ -78,6 +79,7 @@ pytest = "^8.1.1"
 
 [tool.poetry.scripts]
 start = "run:main"
+streamlit = "streamlit:run"
 
 [tool.poetry.group.dev.dependencies]
 jupyter = "*"
